@@ -1,13 +1,20 @@
 {
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+    rust-overlay = {
+      url = "github:oxalica/rust-overlay";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
-  outputs = { self, nixpkgs, ... }:
+  outputs = { self, nixpkgs, rust-overlay, ... }:
     let
       supportedSystems = [ "x86_64-linux" "aarch64-linux" "x86_64-darwin" "aarch64-darwin" ];
       eachSystem = f: nixpkgs.lib.genAttrs supportedSystems (system: f {
-        pkgs = import nixpkgs { inherit system; };
+        pkgs = import nixpkgs {
+          inherit system;
+          overlays = [ rust-overlay.overlays.default ];
+        };
       });
     in
     {
@@ -16,11 +23,12 @@
           commonBuildInputs = with pkgs; [
             bun
             biome
-            rustc
-            cargo
             rustPlatform.rustcSrc
             pkg-config
             openssl
+            (pkgs.rust-bin.stable.latest.default.override {
+              targets = [ "x86_64-pc-windows-msvc" ];
+            })
           ];
 
           linuxBuildInputs = with pkgs; [
@@ -33,10 +41,20 @@
             librsvg
             patchelf
           ];
+
+          windowsCrossBuildInputs = with pkgs; [
+            cargo-xwin
+            clang
+            lld
+            llvm
+            nsis
+          ];
         in
         {
           default = pkgs.mkShell {
-            buildInputs = commonBuildInputs ++ pkgs.lib.optionals pkgs.stdenv.hostPlatform.isLinux linuxBuildInputs;
+            buildInputs = commonBuildInputs
+              ++ pkgs.lib.optionals pkgs.stdenv.hostPlatform.isLinux linuxBuildInputs
+              ++ pkgs.lib.optionals pkgs.stdenv.hostPlatform.isLinux windowsCrossBuildInputs;
 
             shellHook = ''
               export RUST_BACKTRACE=1
