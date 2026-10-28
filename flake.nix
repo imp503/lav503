@@ -23,6 +23,7 @@
           commonBuildInputs = with pkgs; [
             bun
             biome
+            go
             rustPlatform.rustcSrc
             pkg-config
             openssl
